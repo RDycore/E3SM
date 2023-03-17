@@ -1133,6 +1133,9 @@ contains
 #ifdef USE_PETSC_LIB
 #include <petsc/finclude/petsc.h>
 #endif
+#include <petsc/finclude/petsc.h>
+    use petsc
+    use rdycore
     ! !USES:
     use spmdMod    , only : mpicom
     use elm_varctl , only : use_vsfm
@@ -1148,6 +1151,29 @@ contains
 #ifdef USE_PETSC_LIB
     PetscErrorCode        :: ierr                  ! get error code from PETSc
 #endif
+    character(len=1024)   :: config_file
+    PetscErrorCode        :: ierr
+    type(RDy)             :: rdy_
+
+    config_file = 'ex2b.yaml'
+
+    ! set PETSc's communicator
+    PETSC_COMM_WORLD = mpicom
+    PetscCallA(PetscInitialize(ierr))
+
+    ! initialize subsystems
+    PetscCallA(RDyInit(ierr))
+
+    ! create rdycore and set it up with the given file
+    PetscCallA(RDyCreate(PETSC_COMM_WORLD, config_file, rdy_, ierr))
+    PetscCallA(RDySetup(rdy_, ierr))
+
+    ! Run the simulation to completion.
+    PetscCallA(RDyRun(rdy_, ierr))
+
+    PetscCallA(RDyDestroy(rdy_, ierr));
+
+    PetscCallA(RDyFinalize(ierr));
 
     if ( (.not. use_vsfm)               .and. &
          (.not. lateral_connectivity)   .and. &
