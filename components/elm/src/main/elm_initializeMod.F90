@@ -1190,7 +1190,7 @@ contains
     PetscCallA(RDySetup(rdy_, ierr))
 
     ! Run the simulation to completion.
-    PetscCallA(RDyRun(rdy_, ierr))
+    PetscCallA(RDyAdvance(rdy_, ierr))
 
     PetscCallA(RDyDestroy(rdy_, ierr));
 
