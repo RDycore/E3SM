@@ -71,6 +71,7 @@ module rof_comp_mct
   use iso_c_binding
   use iMOAB, only: iMOAB_DefineTagStorage, iMOAB_SetDoubleTagStorage
 #endif
+  use rdycoreMod        , only : rdycore_init, rdycore_run, rdycore_final
 !
 ! PUBLIC MEMBER FUNCTIONS:
   implicit none
@@ -283,6 +284,8 @@ contains
     ! Read namelist, grid and surface data
     call Rtmini(rtm_active=rof_prognostic,flood_active=flood_present,rtm_mesh=rtm_mesh)
 
+    call rdycore_init()
+
     if (rof_prognostic) then
        ! Initialize memory for input state
        begr = rtmCTL%begr
@@ -494,7 +497,10 @@ contains
     ! Reset shr logging to my original values
     call shr_file_setLogUnit (shrlogunit)
     call shr_file_setLogLevel(shrloglev)
-  
+
+    ! Run RDycore
+    call rdycore_run()
+
 #if (defined _MEMTRACE)
     if(masterproc) then
        lbnum=1
@@ -526,7 +532,12 @@ contains
     ! deallocate moab fields array
       deallocate (r2x_rm)
 #endif
-  end subroutine rof_final_mct
+
+    ! Run RDycore
+    call rdycore_final()
+
+
+   end subroutine rof_final_mct
 
 !===============================================================================
 
