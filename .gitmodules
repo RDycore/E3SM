@@ -82,4 +82,6 @@
 [submodule "externals/mam4xx"]
 	path = externals/mam4xx
 	url = git@github.com:eagles-project/mam4xx.git
-
+[submodule "rdycore"]
+	path = externals/rdycore
+	url = git@github.com:rdycore/rdycore
