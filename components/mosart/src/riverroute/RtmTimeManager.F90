@@ -22,6 +22,7 @@ module RtmTimeManager
       get_step_size,            &! return step size in seconds
       get_nstep,                &! return timestep number
       get_curr_date,            &! return date components at end of current timestep
+      get_curr_time_string,     &! return current time
       get_prev_date,            &! return date components at beginning of current timestep
       get_start_date,           &! return components of the start date
       get_ref_date,             &! return components of the reference date
@@ -839,7 +840,28 @@ subroutine get_curr_date(yr, mon, day, tod, offset)
 
 end subroutine get_curr_date
 
-!=========================================================================================
+  !=========================================================================================
+
+subroutine get_curr_time_string(dateTimeString)
+
+   !-----------------------------------------------------------------------------------------
+   ! Returns the current time
+   character(len=*), intent(out) :: dateTimeString
+
+   type(ESMF_Time) :: date
+   integer :: rc
+   character(len=*), parameter :: sub = 'clm::get_curr_time_string'
+   !-----------------------------------------------------------------------------------------
+
+   call ESMF_ClockGet( tm_clock, currTime=date, rc=rc )
+   call chkrc(rc, sub//': error return from ESMF_ClockGet')
+
+   call ESMF_TimeGet(date, timeString=dateTimeString, rc=rc)
+   call chkrc(rc, sub//': error return from ESMF_TimeGet')
+
+ end subroutine get_curr_time_string
+
+ !=========================================================================================
 
 subroutine get_prev_date(yr, mon, day, tod)
 
