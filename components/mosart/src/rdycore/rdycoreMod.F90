@@ -72,8 +72,8 @@ contains
     !  time_1 rain_value_1
     !  time_2 rain_value_2
     !
-    PetscCallA(VecCreate(PETSC_COMM_WORLD, rain_timeseries, ierr))
-    PetscCallA(PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'rain.bin', FILE_MODE_READ, viewer, ierr))
+    PetscCallA(VecCreate(PETSC_COMM_SELF, rain_timeseries, ierr))
+    PetscCallA(PetscViewerBinaryOpen(PETSC_COMM_SELF, 'rain.bin', FILE_MODE_READ, viewer, ierr))
     PetscCallA(VecLoad(rain_timeseries, viewer, ierr))
     PetscCallA(PetscViewerDestroy(viewer, ierr))
 
