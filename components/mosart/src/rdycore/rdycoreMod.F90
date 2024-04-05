@@ -5,7 +5,6 @@ module rdycoreMod
   use petsc
   use rdycore
   use RtmSpmd      , only : mpicom_rof, masterproc
-  use RtmVar       , only : iulog
   use shr_kind_mod , only : r8 => shr_kind_r8
   use shr_sys_mod  , only : shr_sys_flush
 
@@ -13,12 +12,16 @@ module rdycoreMod
 
   private
 
-  type(RDy) :: rdy_
-  Vec       :: rain_timeseries
-  PetscInt  :: rain_stride
-  PetscInt  :: rain_nstep
-  PetscInt  :: num_cells_owned
+  type(RDy)          :: rdy_
+
+  Vec                :: rain_timeseries
+  PetscInt           :: rain_stride
+  PetscInt           :: rain_nstep
+  PetscInt           :: num_cells_owned
   PetscReal, pointer :: rain_data(:)
+
+  integer, public    :: iulog = 6
+
 
   public :: rdycore_init
   public :: rdycore_run
@@ -43,7 +46,12 @@ contains
     PetscErrorCode        :: ierr
  
     config_file = 'rdycore.yaml'
- 
+
+    call rdycore_setIO("rof_modelio.nml", iulog)
+    if (masterproc) then
+       write(iulog,*)'RDycore model initialization'
+    end if
+
     ! set PETSc's communicator
     PETSC_COMM_WORLD = mpicom_rof
     PetscCallA(PetscInitialize(ierr))
@@ -73,6 +81,10 @@ contains
     rain_stride = 2
     PetscCallA(VecGetSize(rain_timeseries, size, ierr))
     rain_nstep = size/rain_stride
+
+    if (masterproc) then
+       write(iulog,*)'RDycore model initialization completed'
+    end if
 
   end subroutine rdycore_init
 
@@ -106,7 +118,6 @@ contains
        call shr_sys_flush(iulog)
     end if
 
-
     ! Find the current rainfall
     PetscCallA(VecGetArrayF90(rain_timeseries, rain_p, ierr))
     found = PETSC_FALSE
@@ -129,7 +140,7 @@ contains
 
     ! Set spatially homogeneous rainfall for all grid cells
     rain_data(:) = cur_rain
-    PetscCallA(RDySetWaterSource(rdy_, rain_data, ierr))
+    PetscCallA(RDySetWaterSourceForLocalCell(rdy_, num_cells_owned, rain_data, ierr))
 
     ! Set the coupling time step
     PetscCallA(RDySetCouplingInterval(rdy_, dtime, ierr))
@@ -152,6 +163,9 @@ contains
     ! !LOCAL VARIABLES:
     PetscErrorCode :: ierr
 
+    ! close the logfile
+    close(iulog)
+
     ! deallocate memory for rain data
     deallocate(rain_data)
     PetscCallA(VecDestroy(rain_timeseries, ierr))
@@ -164,5 +178,85 @@ contains
  
   end subroutine rdycore_final
  
+  !===============================================================================
+  ! This subroutine is based on share/util/shr_file_mod.F90.
+  ! The rof_modelio.nml file is opened and the value for the 'logfile' is read that
+  ! would be something like the following:
+  !
+  ! logfile = "rof.log.230804-204952"
+  !
+  ! Based on the above-mentioned value, a logfile for RDycore is opend that would be
+  ! "rdy.rof.log.230804-204952".
+  !
+  SUBROUTINE rdycore_setIO( nmlfile, funit)
+
+    use shr_kind_mod
+    use shr_sys_mod
+    use shr_file_mod, only : shr_file_getUnit, shr_file_freeUnit
+    use shr_log_mod, only: s_loglev  => shr_log_Level
+    use shr_log_mod, only: s_logunit => shr_log_Unit
+
+    implicit none
+
+    ! !INPUT/OUTPUT PARAMETERS:
+
+    character(len=*)    ,intent(in)  :: nmlfile  ! namelist filename
+    integer(SHR_KIND_IN),intent(in)  :: funit    ! unit number for log file
+
+    !EOP
+
+    !--- local ---
+    logical                :: exists   ! true if file exists
+    character(SHR_KIND_CL) :: diri     ! directory to cd to
+    character(SHR_KIND_CL) :: diro     ! directory to cd to
+    character(SHR_KIND_CL) :: logfile  ! open unit 6 to this file
+    character(SHR_KIND_CL) :: rdylogfile! open unit 6 to this file
+    integer(SHR_KIND_IN)   :: unit     ! unit number
+    integer(SHR_KIND_IN)   :: rcode    ! error code
+    integer(SHR_KIND_IN)   :: l
+
+    namelist / modelio / diri,diro,logfile
+
+    !--- formats ---
+    character(*),parameter :: subName = '(shr_file_setIO) '
+    character(*),parameter :: F00   = "('(shr_file_setIO) ',4a)"
+    character(*),parameter :: F01   = "('(shr_file_setIO) ',3a,i6)"
+
+    !-------------------------------------------------------------------------------
+    ! Notes:
+    !
+    !-------------------------------------------------------------------------------
+
+    diri = "."
+    diro = "."
+    logfile = ""
+
+    inquire(file=nmlfile,exist=exists)
+
+    if (.not. exists) then
+       if (s_loglev > 0) write(s_logunit,F00) "file ",trim(nmlfile)," nonexistent"
+       return
+    else
+       unit = shr_file_getUnit()
+       open (unit,file=nmlfile,action="READ")
+       read (unit,nml=modelio,iostat=rcode)
+       close(unit)
+       call shr_file_freeUnit( unit )
+       if (rcode /= 0) then
+          write(s_logunit,F01) 'ERROR: reading ',trim(nmlfile),': iostat=',rcode
+          call shr_sys_abort(subName//" ERROR reading "//trim(nmlfile) )
+       end if
+    endif
+
+    if (len_trim(logfile) > 0) then
+       l = len(logfile)
+       rdylogfile = logfile(5:l)
+       open(funit,file=trim(diro)//"/rdy."//trim(rdylogfile))
+    else
+       if (s_loglev > 0) write(s_logunit,F00) "logfile not opened"
+    endif
+
+  END SUBROUTINE rdycore_setIO
+
 end module rdycoreMod
 
