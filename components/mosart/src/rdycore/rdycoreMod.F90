@@ -7,6 +7,8 @@ module rdycoreMod
   use RtmSpmd      , only : mpicom_rof, masterproc
   use shr_kind_mod , only : r8 => shr_kind_r8
   use shr_sys_mod  , only : shr_sys_flush
+  use lnd2rdyType  , only : lnd2rdy_type
+  use rdydecompMod , only : rdy_bounds_type
 
   implicit none
 
@@ -20,8 +22,10 @@ module rdycoreMod
   PetscInt           :: num_cells_owned
   PetscReal, pointer :: rain_data(:)
 
-  integer, public    :: iulog = 6
+  type(lnd2rdy_type)   , public :: lnd2rdy_vars
+  type(rdy_bounds_type), public :: rdy_bounds
 
+  integer, public    :: iulog = 6
 
   public :: rdycore_init
   public :: rdycore_run
@@ -44,7 +48,7 @@ contains
     PetscViewer           :: viewer
     PetscInt              :: size
     PetscErrorCode        :: ierr
- 
+
     config_file = 'rdycore.yaml'
 
     call rdycore_setIO("rof_modelio.nml", iulog)
@@ -86,6 +90,10 @@ contains
        write(iulog,*)'RDycore model initialization completed'
     end if
 
+    rdy_bounds%begg = 1
+    rdy_bounds%endg = num_cells_owned
+    call lnd2rdy_vars%Init(rdy_bounds)
+
   end subroutine rdycore_init
 
   !-----------------------------------------------------------------------
@@ -106,6 +114,7 @@ contains
     PetscInt             :: t, nstep
     PetscReal            :: time_dn, time_up, cur_time, cur_rain
     PetscBool            :: found
+    PetscInt             :: g, idx
     PetscErrorCode       :: ierr
 
     dtime    = get_step_size()
@@ -140,6 +149,11 @@ contains
 
     ! Set spatially homogeneous rainfall for all grid cells
     rain_data(:) = cur_rain
+
+    do g = rdy_bounds%begg, rdy_bounds%endg
+       idx = g - rdy_bounds%begg + 1
+       rain_data(idx) = lnd2rdy_vars%forc_qsur(g) + lnd2rdy_vars%forc_qsub(g)
+    end do
     PetscCallA(RDySetWaterSourceForLocalCell(rdy_, num_cells_owned, rain_data, ierr))
 
     ! Set the coupling time step
