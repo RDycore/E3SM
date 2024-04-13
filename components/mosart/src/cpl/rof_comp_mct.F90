@@ -71,7 +71,10 @@ module rof_comp_mct
   use iso_c_binding
   use iMOAB, only: iMOAB_DefineTagStorage, iMOAB_SetDoubleTagStorage
 #endif
-  use rdycoreMod        , only : rdycore_init, rdycore_run, rdycore_final
+  use rdy_cpl_indices  , only : rdy_cpl_indices_set
+  use rdy_import_export, only : rdy_import_mct
+  use rdycoreMod       , only : rdycore_init, rdycore_run, rdycore_final
+  use rdycoreMod       , only : rdy_bounds, lnd2rdy_vars
 !
 ! PUBLIC MEMBER FUNCTIONS:
   implicit none
@@ -177,6 +180,7 @@ contains
 
     ! Determine attriute vector indices
     call rof_cpl_indices_set()
+    call rdy_cpl_indices_set()
 
     ! Initialize mosart MPI communicator 
     call RtmSpmdInit(mpicom_loc)
@@ -444,6 +448,11 @@ contains
     call t_startf ('lc_rof_import')
     call rof_import_mct( x2r_r)
     call t_stopf ('lc_rof_import')
+
+    call t_startf ('lc_rdy_import')
+    call rdy_import_mct(rdy_bounds, x2r_r%rattr, lnd2rdy_vars)
+    call t_stopf ('lc_rdy_import')
+
 #ifdef HAVE_MOAB
 
 #ifdef MOABCOMP
