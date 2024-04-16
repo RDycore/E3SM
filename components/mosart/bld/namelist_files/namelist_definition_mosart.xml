@@ -193,7 +193,7 @@ Default: .false.
        type="char*32" 
        category="mosart"
        group="mosart_inparm" 
-       valid_values="basin,1d,roundrobin" >
+       valid_values="basin,1d,roundrobin,rdycore" >
 Decomposition Option for mosart
 Default: 'basin'
 </entry>

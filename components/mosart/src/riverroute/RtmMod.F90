@@ -55,6 +55,7 @@ module RtmMod
   use mct_mod
   use perf_mod
   use pio
+  use rdycoreMod, only        : rdycore_pocn
 !
 ! !PUBLIC TYPES:
   implicit none
@@ -1195,6 +1196,15 @@ contains
              endif
           endif
        enddo
+
+    elseif (trim(decomp_option) == 'rdycore') then
+
+       baspe = 0
+       nop = 0
+       do nr=1,rtmlon*rtmlat
+          pocn(nr) = rdycore_pocn(nr)
+          nop(pocn(nr)) = nop(pocn(nr)) + 1
+       end do
 
     else
        write(iulog,*) subname,' ERROR decomp option unknown ',trim(decomp_option)

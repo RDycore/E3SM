@@ -14,15 +14,20 @@ module rdycoreMod
 
   private
 
-  type(RDy)          :: rdy_
+  type(RDy)                               :: rdy_                      ! RDycore data structure
 
-  PetscInt           :: num_cells_owned
-  PetscReal, pointer :: total_runoff_data(:)
+  PetscInt                                :: num_cells_owned           ! number of cells that locally owned
+  PetscInt                                :: num_cells_global          ! total number of cells in the mesh
+  PetscInt              , pointer         :: natural_id_cells_owned(:) ! natural IDs of cells that are locally owned
 
-  type(lnd2rdy_type)   , public :: lnd2rdy_vars
-  type(rdy_bounds_type), public :: rdy_bounds
+  integer               , public, pointer :: rdycore_pocn(:)           ! PE rank for each grid cell
 
-  integer, public    :: iulog = 6
+  PetscReal             , pointer         :: total_runoff_data(:)      ! the water source to RDycore's SWE
+
+  type(lnd2rdy_type)    , public          :: lnd2rdy_vars              ! data struture saving data sent from lnd to rdycore
+  type(rdy_bounds_type) , public          :: rdy_bounds                ! bounds of grid cells
+
+  integer               , public          :: iulog = 6
 
   public :: rdycore_init
   public :: rdycore_run
@@ -43,7 +48,13 @@ contains
     ! !LOCAL VARIABLES:
     character(len=1024)   :: config_file
     PetscViewer           :: viewer
-    PetscInt              :: size
+    PetscInt              :: g, myrank
+    Vec                   :: owner_mpi, owner_seq
+    PetscScalar, pointer  :: vec_ptr(:), rank(:)
+    PetscInt   , pointer  :: int_ptr(:)
+    IS                    :: is_from, is_to
+    VecScatter            :: scatter
+    character(len=100)    :: string
     PetscErrorCode        :: ierr
 
     config_file = 'rdycore.yaml'
@@ -68,13 +79,84 @@ contains
     PetscCallA(RDyGetNumLocalCells(rdy_, num_cells_owned, ierr))
     allocate(total_runoff_data(num_cells_owned))
 
+    allocate(natural_id_cells_owned(num_cells_owned))
+    PetscCallA(RDyGetLocalCellNaturalIDs(rdy_, num_cells_owned, natural_id_cells_owned, ierr))
+
+    PetscCallA(RDyGetNumGlobalCells(rdy_, num_cells_global, ierr))
+
+    ! create a MPI and sequential Vec
+    PetscCallA(VecCreateMPI(PETSC_COMM_WORLD, num_cells_owned, PETSC_DETERMINE, owner_mpi, ierr))
+    PetscCallA(VecCreateSeq(MPI_COMM_SELF, num_cells_global, owner_seq, ierr))
+
+    ! find the rank for the processor
+    PetscCallA(mpi_comm_rank(PETSC_COMM_WORLD, myrank, ierr))
+
+    allocate(rank(num_cells_owned))
+    write(iulog,*)'myrank ',myrank
+    rank(:) = myrank
+    PetscCallA(VecSetValues(owner_mpi, num_cells_owned, natural_id_cells_owned, rank, INSERT_VALUES, ierr))
+    deallocate(rank)
+    PetscCallA(VecAssemblyBegin(owner_mpi, ierr))
+    PetscCallA(VecAssemblyEnd(owner_mpi, ierr))
+
+#if 0
+       string = 'owner_mpi.txt'
+       PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD, trim(string), viewer, ierr))
+       PetscCallA(VecView(owner_mpi, viewer, ierr))
+       PetscCallA(PetscViewerDestroy(viewer, ierr))
+#endif
+
+    ! create index set to scatter from the MPI Vec and to sequential Vec
+    allocate(int_ptr(num_cells_global))
+    do g = 1, num_cells_global
+       int_ptr(g) = g - 1
+    end do
+    PetscCallA(ISCreateGeneral(PETSC_COMM_WORLD, num_cells_global, int_ptr, PETSC_COPY_VALUES, is_from, ierr))
+    PetscCallA(ISCreateGeneral(PETSC_COMM_WORLD, num_cells_global, int_ptr, PETSC_COPY_VALUES, is_to, ierr))
+    deallocate(int_ptr)
+
+    ! create the VecScatter
+    PetscCallA(VecScatterCreate(owner_mpi, is_from, owner_seq, is_to, scatter, ierr))
+    PetscCallA(ISDestroy(is_from, ierr))
+    PetscCallA(ISDestroy(is_to, ierr))
+
+    ! scatter th data
+    PetscCallA(VecScatterBegin(scatter, owner_mpi, owner_seq, INSERT_VALUES, SCATTER_FORWARD, ierr))
+    PetscCallA(VecScatterEnd(scatter, owner_mpi, owner_seq, INSERT_VALUES, SCATTER_FORWARD, ierr))
+
+#if 0
+       write(string,*)myrank
+       string = 'owner_seq_' // trim(adjustl(string)) // '.txt'
+       PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_SELF, trim(string), viewer, ierr))
+       PetscCallA(VecView(owner_seq, viewer, ierr))
+       PetscCallA(PetscViewerDestroy(viewer, ierr))
+#endif
+
+    ! save PE number for each grid cell that MOSART will use
+    allocate(rdycore_pocn(num_cells_global))
+
+    ! determine the begin/end bounds of grid cells
+    PetscCallA(VecGetArrayF90(owner_seq, vec_ptr, ierr))
+    rdy_bounds%begg = 1
+    do g = 1, num_cells_global
+       rdycore_pocn(g) = int(vec_ptr(g))
+       if (int(vec_ptr(g)) < myrank) then
+          rdy_bounds%begg = rdy_bounds%begg + 1
+       end if
+    end do
+    rdy_bounds%endg = rdy_bounds%begg - 1 + num_cells_owned
+    PetscCallA(VecRestoreArrayF90(owner_seq, vec_ptr, ierr))
+
+    ! allocate data structure for exchanging data from land to rdycore
+    call lnd2rdy_vars%Init(rdy_bounds)
+
+    ! free up memory
+    PetscCallA(VecDestroy(owner_mpi, ierr))
+    PetscCallA(VecDestroy(owner_seq, ierr))
+
     if (masterproc) then
        write(iulog,*)'RDycore model initialization completed'
     end if
-
-    rdy_bounds%begg = 1
-    rdy_bounds%endg = num_cells_owned
-    call lnd2rdy_vars%Init(rdy_bounds)
 
   end subroutine rdycore_init
 
@@ -141,6 +223,7 @@ contains
 
     ! deallocate memory for rain data
     deallocate(total_runoff_data)
+    deallocate(rdycore_pocn)
 
     ! destroy RDy object
     PetscCallA(RDyDestroy(rdy_, ierr));
