@@ -286,9 +286,10 @@ contains
     use_ocn_rof_two_way = ocn_rof_two_way
 
     ! Read namelist, grid and surface data
-    call Rtmini(rtm_active=rof_prognostic,flood_active=flood_present,rtm_mesh=rtm_mesh)
 
     call rdycore_init()
+
+    call Rtmini(rtm_active=rof_prognostic,flood_active=flood_present,rtm_mesh=rtm_mesh)
 
     if (rof_prognostic) then
        ! Initialize memory for input state
