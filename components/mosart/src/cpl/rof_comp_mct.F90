@@ -451,7 +451,7 @@ contains
     call t_stopf ('lc_rof_import')
 
     call t_startf ('lc_rdy_import')
-    call rdy_import_mct(rdy_bounds, x2r_r%rattr, lnd2rdy_vars)
+    call rdy_import_mct(rdy_bounds, x2r_r%rattr, rtmctl%endr - rtmctl%begr + 1, lnd2rdy_vars)
     call t_stopf ('lc_rdy_import')
 
 #ifdef HAVE_MOAB

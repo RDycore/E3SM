@@ -7,7 +7,6 @@ module rdy_import_export
   use rdydecompMod    , only : rdy_bounds_type
   use lnd2rdyType     , only : lnd2rdy_type
   use rdycoreMod      , only : rtm2rdy_map, rtm2rdy_nvars
-  use rof_cpl_indices , only : nt_rtm
   use rdy_cpl_indices
 
   implicit none
@@ -18,7 +17,7 @@ module rdy_import_export
 contains
 
   !------------------------------------------------------------------------
-  subroutine rdy_import_mct(rdy_bounds, x2rd, lnd2rdy_vars)
+  subroutine rdy_import_mct(rdy_bounds, x2rd, ncells_rtm, lnd2rdy_vars)
     !
     ! !DESCRIPTION:
     ! Imports data from the coupler for the RDycore
@@ -28,6 +27,7 @@ contains
     ! !ARGUMENTS:
     type(rdy_bounds_type) , intent (in)    :: rdy_bounds
     real(r8)              , intent (in)    :: x2rd(:,:)
+    integer               , intent (in)    :: ncells_rtm
     type(lnd2rdy_type)    , intent (inout) :: lnd2rdy_vars
     !
     ! !LOCAL VARIABLES:
@@ -41,7 +41,7 @@ contains
 
     ! pack the data
     PetscCallA(VecGetArrayF90(rtm2rdy_map%s_vec, v_loc, ierr))
-    do ii = 1, nt_rtm
+    do ii = 1, ncells_rtm
        v_loc((ii-1)*rtm2rdy_nvars + 1) = x2rd(index_x2rdy_Flrl_qsur, ii) * runoff_unit_conversion
        v_loc((ii-1)*rtm2rdy_nvars + 2) = x2rd(index_x2rdy_Flrl_qsub, ii) * runoff_unit_conversion
     end do
