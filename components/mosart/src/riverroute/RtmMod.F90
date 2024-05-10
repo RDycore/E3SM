@@ -55,7 +55,7 @@ module RtmMod
   use mct_mod
   use perf_mod
   use pio
-  use rdycoreMod, only        : rdycore_pocn
+  use rdycoreMod, only        : rdycore_pocn, num_cells_global, rdycore_init_maps
 !
 ! !PUBLIC TYPES:
   implicit none
@@ -1201,11 +1201,43 @@ contains
 
        baspe = 0
        nop = 0
-       do nr=1,rtmlon*rtmlat
-          pocn(nr) = rdycore_pocn(nr)
-          nop(pocn(nr)) = nop(pocn(nr)) + 1
-       end do
 
+       if (rtmlon * rtmlat == num_cells_global) then
+          ! If the number of grid cells in RDycore and MOSART are same,
+          ! then use RDycore's domain decompoisition
+          do nr=1,rtmlon*rtmlat
+             pocn(nr) = rdycore_pocn(nr)
+             nop(pocn(nr)) = nop(pocn(nr)) + 1
+          end do
+
+          ! create maps
+          call rdycore_init_maps(use_files=.false., num_cells_rtm=nop(iam))
+
+       else
+          ! Use '1d' domain decomposition
+          ! distribute active points in 1d fashion to pes
+          ! baspe is the pe assignment
+          ! maxrtm is the maximum number of points to assign to each pe
+          baspe = 0
+          maxrtm = (nrof-1)/npes + 1
+          do nr=1,rtmlon*rtmlat
+             if (gmask(nr) >= 1) then
+                pocn(nr) = baspe
+                nop(baspe) = nop(baspe) + 1
+                if (nop(baspe) >= maxrtm) then
+                   baspe = (mod(baspe+1,npes))
+                   if (baspe < 0 .or. baspe > npes-1) then
+                      write(iulog,*) subname,' ERROR basepe ',baspe,npes
+                      call shr_sys_abort(subname//' ERROR pocn lnd')
+                   endif
+                endif
+             endif
+          enddo
+
+          ! create maps
+          call rdycore_init_maps(use_files=.true., num_cells_rtm=nop(iam))
+
+       endif
     else
        write(iulog,*) subname,' ERROR decomp option unknown ',trim(decomp_option)
        call shr_sys_abort(subname//' ERROR pocn lnd')

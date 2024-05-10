@@ -9,6 +9,7 @@ module rdycoreMod
   use shr_sys_mod  , only : shr_sys_flush
   use lnd2rdyType  , only : lnd2rdy_type
   use rdydecompMod , only : rdy_bounds_type
+  use rdymapMod    , only : rdy_map_type
 
   implicit none
 
@@ -16,8 +17,8 @@ module rdycoreMod
 
   type(RDy)                               :: rdy_                      ! RDycore data structure
 
-  PetscInt                                :: num_cells_owned           ! number of cells that locally owned
-  PetscInt                                :: num_cells_global          ! total number of cells in the mesh
+  PetscInt              , public          :: num_cells_owned           ! number of cells that locally owned
+  PetscInt              , public          :: num_cells_global          ! total number of cells in the mesh
   PetscInt              , pointer         :: natural_id_cells_owned(:) ! natural IDs of cells that are locally owned
 
   integer               , public, pointer :: rdycore_pocn(:)           ! PE rank for each grid cell
@@ -27,9 +28,12 @@ module rdycoreMod
   type(lnd2rdy_type)    , public          :: lnd2rdy_vars              ! data struture saving data sent from lnd to rdycore
   type(rdy_bounds_type) , public          :: rdy_bounds                ! bounds of grid cells
 
+  type(rdy_map_type)    , public          :: rtm2rdy_map
+  integer               , public          :: rtm2rdy_nvars = 2
   integer               , public          :: iulog = 6
 
   public :: rdycore_init
+  public :: rdycore_init_maps
   public :: rdycore_run
   public :: rdycore_final
 
@@ -50,6 +54,7 @@ contains
     PetscViewer           :: viewer
     PetscInt              :: g, myrank
     Vec                   :: owner_mpi, owner_seq
+    Vec                   :: nid_owned_seq
     PetscScalar, pointer  :: vec_ptr(:), rank(:)
     PetscInt   , pointer  :: int_ptr(:)
     IS                    :: is_from, is_to
@@ -82,14 +87,29 @@ contains
     allocate(natural_id_cells_owned(num_cells_owned))
     PetscCallA(RDyGetLocalCellNaturalIDs(rdy_, num_cells_owned, natural_id_cells_owned, ierr))
 
+    ! find the rank for the processor
+    PetscCallA(mpi_comm_rank(PETSC_COMM_WORLD, myrank, ierr))
+
+#if 0
+    PetscCallA(VecCreateSeq(PETSC_COMM_SELF, num_cells_owned, nid_owned_seq, ierr))
+
+    write(string,*)myrank
+    PetscCallA(VecGetArrayF90(nid_owned_seq, vec_ptr,ierr))
+    vec_ptr(:) = natural_id_cells_owned(:) * 1.d0
+    PetscCallA(VecRestoreArrayF90(nid_owned_seq, vec_ptr,ierr))
+
+    string = 'natural_id_seq_' // trim(adjustl(string)) // '.txt'
+    PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_SELF, trim(string), viewer, ierr))
+    PetscCallA(VecView(nid_owned_seq, viewer, ierr))
+    PetscCallA(PetscViewerDestroy(viewer, ierr))
+    PetscCallA(VecDestroy(nid_owned_seq, ierr))
+#endif
+
     PetscCallA(RDyGetNumGlobalCells(rdy_, num_cells_global, ierr))
 
     ! create a MPI and sequential Vec
     PetscCallA(VecCreateMPI(PETSC_COMM_WORLD, num_cells_owned, PETSC_DETERMINE, owner_mpi, ierr))
-    PetscCallA(VecCreateSeq(MPI_COMM_SELF, num_cells_global, owner_seq, ierr))
-
-    ! find the rank for the processor
-    PetscCallA(mpi_comm_rank(PETSC_COMM_WORLD, myrank, ierr))
+    PetscCallA(VecCreateSeq(PETSC_COMM_SELF, num_cells_global, owner_seq, ierr))
 
     allocate(rank(num_cells_owned))
     write(iulog,*)'myrank ',myrank
@@ -100,10 +120,10 @@ contains
     PetscCallA(VecAssemblyEnd(owner_mpi, ierr))
 
 #if 0
-       string = 'owner_mpi.txt'
-       PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD, trim(string), viewer, ierr))
-       PetscCallA(VecView(owner_mpi, viewer, ierr))
-       PetscCallA(PetscViewerDestroy(viewer, ierr))
+    string = 'owner_mpi.txt'
+    PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD, trim(string), viewer, ierr))
+    PetscCallA(VecView(owner_mpi, viewer, ierr))
+    PetscCallA(PetscViewerDestroy(viewer, ierr))
 #endif
 
     ! create index set to scatter from the MPI Vec and to sequential Vec
@@ -125,11 +145,11 @@ contains
     PetscCallA(VecScatterEnd(scatter, owner_mpi, owner_seq, INSERT_VALUES, SCATTER_FORWARD, ierr))
 
 #if 0
-       write(string,*)myrank
-       string = 'owner_seq_' // trim(adjustl(string)) // '.txt'
-       PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_SELF, trim(string), viewer, ierr))
-       PetscCallA(VecView(owner_seq, viewer, ierr))
-       PetscCallA(PetscViewerDestroy(viewer, ierr))
+    write(string,*)myrank
+    string = 'owner_seq_' // trim(adjustl(string)) // '.txt'
+    PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_SELF, trim(string), viewer, ierr))
+    PetscCallA(VecView(owner_seq, viewer, ierr))
+    PetscCallA(PetscViewerDestroy(viewer, ierr))
 #endif
 
     ! save PE number for each grid cell that MOSART will use
@@ -159,6 +179,181 @@ contains
     end if
 
   end subroutine rdycore_init
+
+  !-----------------------------------------------------------------------
+  subroutine rdycore_init_maps(use_files, num_cells_rtm)
+    !
+    ! !DESCRIPTION:
+    ! Initialize RDycore
+    !
+    logical               :: use_files
+    integer               :: num_cells_rtm
+    !
+    character(len=1024)   :: map_file
+
+    if (use_files) then
+       map_file = 'map_MOSART_to_RDycore.bin'
+       call rdycore_init_map_from_file(rtm2rdy_map, map_file, num_cells_rtm, num_cells_owned, rtm2rdy_nvars)
+    else
+       call rdycore_init_identity_map(rtm2rdy_map, num_cells_owned, rtm2rdy_nvars, rdy_bounds%begg)
+    end if
+
+  end subroutine rdycore_init_maps
+
+  !-----------------------------------------------------------------------
+  subroutine rdycore_init_map_from_file(map, filename, src_ncells, dst_ncells, nvars)
+    !
+    ! !DESCRIPTION:
+    ! Initialize RDycore
+    !
+    ! !USES:
+    implicit none
+    !
+    type(rdy_map_type)   :: map
+    character(len=1024)  :: filename
+    integer              :: src_ncells
+    integer              :: dst_ncells
+    integer              :: nvars
+    !
+    ! !LOCAL VARIABLES:
+    character(len=1024)  :: string
+    PetscInt             :: ii
+    Vec                  :: src_idx_vec
+    Vec                  :: src_vec, dst_vec
+    IS                   :: is_from, is_to
+    PetscInt, pointer    :: int_array(:)
+    PetscScalar, pointer :: v_loc(:)
+    PetscViewer          :: viewer
+    PetscErrorCode       :: ierr
+
+    ! read the file
+    PetscCallA(RDyReadOneDOFGlobalVecFromBinaryFile(rdy_, filename, src_idx_vec, ierr))
+
+#if 0
+    string = 'src_idx.txt'
+    PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD, trim(string), viewer, ierr))
+    PetscCallA(VecView(src_idx_vec, viewer, ierr))
+    PetscCallA(PetscViewerDestroy(viewer, ierr))
+#endif
+
+    ! create Vecs for source and destination grids
+    PetscCallA(VecCreateMPI(PETSC_COMM_WORLD, src_ncells*nvars, PETSC_DETERMINE, map%s_vec, ierr))
+    PetscCallA(VecSetBlockSize(map%s_vec, nvars, ierr))
+
+    PetscCallA(VecCreateSeq(PETSC_COMM_SELF, dst_ncells*nvars, map%d_vec, ierr))
+    PetscCallA(VecSetBlockSize(map%d_vec, nvars, ierr))
+
+    allocate(int_array(dst_ncells))
+
+    ! create IS from source grid
+    PetscCallA(VecGetArrayF90(src_idx_vec, v_loc, ierr))
+    do ii = 1, dst_ncells
+       int_array(ii) = int(v_loc(ii)) - 1 ! converting from 1-based index to 0-based index
+    end do
+    PetscCallA(VecRestoreArrayF90(src_idx_vec, v_loc, ierr))
+    PetscCallA(ISCreateBlock(PETSC_COMM_WORLD, nvars, dst_ncells, int_array, PETSC_COPY_VALUES, is_from, ierr))
+#if 0
+    string = 'is_from.txt'
+    PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD, trim(string), viewer, ierr))
+    PetscCallA(ISView(is_from, viewer, ierr))
+    PetscCallA(PetscViewerDestroy(viewer, ierr))
+#endif
+
+    ! create IS to destination grid
+    do ii = 1, dst_ncells
+       int_array(ii) = ii - 1 ! converting from 1-based index to 0-based index
+    end do
+    PetscCallA(ISCreateBlock(PETSC_COMM_WORLD, nvars, dst_ncells, int_array, PETSC_COPY_VALUES, is_to, ierr))
+#if 0
+    string = 'is_to.txt'
+    PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD, trim(string), viewer, ierr))
+    PetscCallA(ISView(is_to, viewer, ierr))
+    PetscCallA(PetscViewerDestroy(viewer, ierr))
+#endif
+
+    ! create the VecScatter
+    PetscCallA(VecScatterCreate(map%s_vec, is_from, map%d_vec, is_to, map%s2d_scatter, ierr))
+
+    ! clean up memory
+    PetscCallA(ISDestroy(is_from, ierr))
+    PetscCallA(ISDestroy(is_to, ierr))
+    PetscCallA(VecDestroy(src_idx_vec, ierr))
+
+#if 0
+    string = 's2d_scatter.txt'
+    PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD, trim(string), viewer, ierr))
+    PetscCallA(VecScatterView(map%s2d_scatter, viewer, ierr))
+    PetscCallA(PetscViewerDestroy(viewer, ierr))
+#endif
+
+  end subroutine rdycore_init_map_from_file
+
+  !-----------------------------------------------------------------------
+  subroutine rdycore_init_identity_map(map, ncells, nvars, begg)
+    !
+    ! !DESCRIPTION:
+    ! Initialize RDycore
+    !
+    ! !USES:
+    implicit none
+    !
+    type(rdy_map_type)   :: map
+    integer              :: ncells
+    integer              :: nvars
+    integer              :: begg
+    !
+    ! !LOCAL VARIABLES:
+    character(len=1024)  :: string
+    integer              :: myrank
+    PetscInt             :: ii
+    Vec                  :: src_idx_vec
+    Vec                  :: src_vec, dst_vec
+    IS                   :: is_from, is_to
+    PetscInt, pointer    :: int_array(:)
+    PetscScalar, pointer :: v_loc(:)
+    PetscViewer          :: viewer
+    PetscErrorCode       :: ierr
+
+    ! create Vecs for source and destination grids
+    PetscCallA(VecCreateMPI(PETSC_COMM_WORLD, ncells*nvars, PETSC_DECIDE, map%s_vec, ierr))
+    PetscCallA(VecSetBlockSize(map%s_vec, nvars, ierr))
+
+    PetscCallA(VecCreateSeq(PETSC_COMM_SELF, ncells*nvars, map%d_vec, ierr))
+    PetscCallA(VecSetBlockSize(map%d_vec, nvars, ierr))
+
+    ! find the rank for the processor
+    PetscCallA(mpi_comm_rank(PETSC_COMM_WORLD, myrank, ierr))
+
+    allocate(int_array(ncells))
+
+    ! create IS from source grid
+    do ii = 1, ncells
+       int_array(ii) = ii - 1 + (begg - 1) ! converting from 1-based index to 0-based index
+    end do
+    PetscCallA(ISCreateBlock(PETSC_COMM_WORLD, nvars, ncells, int_array, PETSC_COPY_VALUES, is_from, ierr))
+
+    ! create IS to destination grid
+    do ii = 1, ncells
+       int_array(ii) = ii - 1 ! converting from 1-based index to 0-based index
+    end do
+    PetscCallA(ISCreateBlock(PETSC_COMM_WORLD, nvars, ncells, int_array, PETSC_COPY_VALUES, is_to, ierr))
+
+    ! create the VecScatter
+    PetscCallA(VecScatterCreate(map%s_vec, is_from, map%d_vec, is_to, map%s2d_scatter, ierr))
+
+    ! clean up memory
+    PetscCallA(ISDestroy(is_from, ierr))
+    PetscCallA(ISDestroy(is_to, ierr))
+    PetscCallA(VecDestroy(src_idx_vec, ierr))
+
+#if 0
+    string = 's2d_scatter.txt'
+    PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD, trim(string), viewer, ierr))
+    PetscCallA(VecScatterView(map%s2d_scatter, viewer, ierr))
+    PetscCallA(PetscViewerDestroy(viewer, ierr))
+#endif
+
+  end subroutine rdycore_init_identity_map
 
   !-----------------------------------------------------------------------
   subroutine rdycore_run()
