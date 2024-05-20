@@ -29,7 +29,7 @@ module rdycoreMod
   type(rdy_bounds_type) , public          :: rdy_bounds                ! bounds of grid cells
 
   type(rdy_map_type)    , public          :: rtm2rdy_map
-  integer               , public          :: rtm2rdy_nvars = 2
+  PetscInt              , public          :: rtm2rdy_nvars = 2
   integer               , public          :: iulog = 6
 
   public :: rdycore_init
@@ -52,7 +52,8 @@ contains
     ! !LOCAL VARIABLES:
     character(len=1024)   :: config_file
     PetscViewer           :: viewer
-    PetscInt              :: g, myrank
+    PetscInt              :: g
+    PetscMPIInt           :: myrank
     Vec                   :: owner_mpi, owner_seq
     Vec                   :: nid_owned_seq
     PetscScalar, pointer  :: vec_ptr(:), rank(:)
@@ -189,11 +190,13 @@ contains
     logical               :: use_files
     integer               :: num_cells_rtm
     !
+    PetscInt              :: num_cells_rtm_local
     character(len=1024)   :: map_file
 
+    num_cells_rtm_local = num_cells_rtm
     if (use_files) then
        map_file = 'map_MOSART_to_RDycore.bin'
-       call rdycore_init_map_from_file(rtm2rdy_map, map_file, num_cells_rtm, num_cells_owned, rtm2rdy_nvars)
+       call rdycore_init_map_from_file(rtm2rdy_map, map_file, num_cells_rtm_local, num_cells_owned, rtm2rdy_nvars)
     else
        call rdycore_init_identity_map(rtm2rdy_map, num_cells_owned, rtm2rdy_nvars, rdy_bounds%begg)
     end if
@@ -211,9 +214,9 @@ contains
     !
     type(rdy_map_type)   :: map
     character(len=1024)  :: filename
-    integer              :: src_ncells
-    integer              :: dst_ncells
-    integer              :: nvars
+    PetscInt             :: src_ncells
+    PetscInt             :: dst_ncells
+    PetscInt             :: nvars
     !
     ! !LOCAL VARIABLES:
     character(len=1024)  :: string
@@ -298,13 +301,13 @@ contains
     implicit none
     !
     type(rdy_map_type)   :: map
-    integer              :: ncells
-    integer              :: nvars
-    integer              :: begg
+    PetscInt             :: ncells
+    PetscInt             :: nvars
+    PetscInt             :: begg
     !
     ! !LOCAL VARIABLES:
     character(len=1024)  :: string
-    integer              :: myrank
+    PetscMPIInt          :: myrank
     PetscInt             :: ii
     Vec                  :: src_idx_vec
     Vec                  :: src_vec, dst_vec
