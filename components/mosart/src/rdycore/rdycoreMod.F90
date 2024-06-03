@@ -373,6 +373,7 @@ contains
     character(len=256)   :: dateTimeString
     real(r8)             :: dtime
     PetscInt             :: t, nstep
+    integer(RDyTimeUnit) :: time_unit
     PetscReal            :: time_dn, time_up, cur_time, cur_rain
     PetscBool            :: found
     PetscInt             :: g, idx
@@ -393,10 +394,11 @@ contains
        idx = g - rdy_bounds%begg + 1
        total_runoff_data(idx) = lnd2rdy_vars%forc_qsur(g) + lnd2rdy_vars%forc_qsub(g)
     end do
-    PetscCallA(RDySetWaterSourceForLocalCell(rdy_, num_cells_owned, total_runoff_data, ierr))
+    PetscCallA(RDySetWaterSourceForLocalCells(rdy_, num_cells_owned, total_runoff_data, ierr))
 
     ! Set the coupling time step
-    PetscCallA(RDySetCouplingInterval(rdy_, dtime, ierr))
+    PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
+    PetscCallA(RDySetCouplingInterval(rdy_, time_unit, dtime, ierr))
 
     ! Run the simulation to completion.
     PetscCallA(RDyAdvance(rdy_, ierr))
