@@ -41,7 +41,7 @@ contains
 
     map%s_vec       = PETSC_NULL_VEC
     map%d_vec       = PETSC_NULL_VEC
-    map%s2d_scatter = PETSC_NULL_VECSCATTER
+    map%s2d_scatter = PETSC_NULL_VEC_SCATTER
 
     RDyMapCreate => map
 
