@@ -394,7 +394,7 @@ contains
        idx = g - rdy_bounds%begg + 1
        total_runoff_data(idx) = lnd2rdy_vars%forc_qsur(g) + lnd2rdy_vars%forc_qsub(g)
     end do
-    PetscCallA(RDySetWaterSourceForLocalCells(rdy_, num_cells_owned, total_runoff_data, ierr))
+    PetscCallA(RDySetDomainWaterSource(rdy_, num_cells_owned, total_runoff_data, ierr))
 
     ! Set the coupling time step
     PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
