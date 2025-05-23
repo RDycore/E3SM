@@ -393,6 +393,7 @@ contains
     do g = rdy_bounds%begg, rdy_bounds%endg
        idx = g - rdy_bounds%begg + 1
        total_runoff_data(idx) = lnd2rdy_vars%forc_qsur(g) + lnd2rdy_vars%forc_qsub(g)
+       if (total_runoff_data(idx) < 0._r8) total_runoff_data(idx) = 0._r8
     end do
     PetscCallA(RDySetDomainWaterSource(rdy_, num_cells_owned, total_runoff_data, ierr))
 
