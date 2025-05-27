@@ -23,6 +23,8 @@ module rof_comp_mct
                               index_r2x_Flrr_volrmch, index_r2x_Flrr_supply, &
                               index_r2x_Flrr_deficit
 
+  use rdycoreMod     , only: rdycore_init
+  use RDycoreSpmdMod , only: masterproc, iam, mpicom, RDycoreSpmdInit
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -140,7 +142,9 @@ CONTAINS
     inst_suffix = seq_comm_suffix(rofid)
 
     ! Determine communicator group
-    call mpi_comm_rank(mpicom_rof, my_task, ierr)
+    !call mpi_comm_rank(mpicom_rof, my_task, ierr)
+    call RDycoreSpmdInit(mpicom_rof)
+    my_task = iam
 
     !--- open log file ---
     call shr_file_getLogUnit (shrlogunit)
@@ -171,6 +175,8 @@ CONTAINS
     rofice_present=.false.
     rof_prognostic=.true.
     flood_present=.false.
+
+    call rdycore_init(logunit_rof)
 
     !----------------------------------------------------------------------------
     ! Initialize RDycore
