@@ -27,6 +27,7 @@ module rof_comp_mct
   use rdycoreSpmdMod  , only: masterproc, mpicom_rof, iam, npes, rofid, RDycoreSpmdInit
   use RDycoreIO
 
+  use rdycoreMod     , only: rdycore_init
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -170,6 +171,8 @@ CONTAINS
     rofice_present=.false.
     rof_prognostic=.true.
     flood_present=.false.
+
+    call rdycore_init(logunit_rof)
 
     !----------------------------------------------------------------------------
     ! Initialize RDycore
