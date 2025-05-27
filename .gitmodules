@@ -73,7 +73,9 @@
 	path = components/gcam/src
 	url = git@github.com:E3SM-Project/giac
 	branch = master 
-
 [submodule "externals/mam4xx"]
 	path = externals/mam4xx
 	url = git@github.com:E3SM-Project/mam4xx.git
+[submodule "externals/rdycore"]
+	path = externals/rdycore
+	url = git@github.com:rdycore/rdycore
