@@ -417,6 +417,8 @@ CONTAINS
   subroutine rof_domain_mct( lsize, gsMap_rof, dom_rof )
 
     ! ARGUMENTS:
+   use rdycoreMod, only : natural_id_cells_owned
+   !
     implicit none
     integer        , intent(in)    :: lsize
     type(mct_gsMap), intent(in)    :: gsMap_rof
@@ -424,7 +426,6 @@ CONTAINS
     !
     ! LOCAL VARIABLES
     integer :: n, ni              ! index
-    integer :: lstart, lstop      ! index
     integer , pointer :: idata(:) ! temporary
     real(r8), pointer :: data(:)  ! temporary
     real(r8) :: re = SHR_CONST_REARTH*0.001_r8 ! radius of earth (km)
@@ -457,30 +458,27 @@ CONTAINS
     lstop  = start(iam+1) + length(iam+1) - 1
 
     ni = 0
-    do n = lstart, lstop
-       ni = ni + 1
-       data(ni) = lonc(n)
+    do n = 1, lsize
+      ni = natural_id_cells_owned(n) + 1
+      data(n) = lonc(ni)
     end do
     call mct_gGrid_importRattr(dom_rof,"lon",data,lsize)
 
     ni = 0
-    do n = lstart, lstop
-       ni = ni + 1
-       data(ni) = latc(n)
+    do n = 1, lsize
+       ni = natural_id_cells_owned(n) + 1
+       data(n) = latc(ni)
     end do
     call mct_gGrid_importRattr(dom_rof,"lat",data,lsize)
 
-    ni = 0
-    do n = lstart, lstop
-       ni = ni + 1
-       data(ni) = areac(n)*1.0e-6_r8/(re*re)
+    do n = 1, lsize
+      ni = natural_id_cells_owned(n) + 1
+      data(n) = areac(ni)*1.0e-6_r8/(re*re)
     end do
     call mct_gGrid_importRattr(dom_rof,"area",data,lsize)
 
-    ni = 0
-    do n = lstart, lstop
-       ni = ni + 1
-       data(ni) = 1.0_r8
+    do n = 1, lsize
+      data(n) = 1.0_r8
     end do
     call mct_gGrid_importRattr(dom_rof,"mask",data,lsize)
     call mct_gGrid_importRattr(dom_rof,"frac",data,lsize)
