@@ -16,7 +16,7 @@ module rdycoreMod
 
   PetscInt              , public          :: num_cells_owned           ! number of cells that locally owned
   PetscInt              , public          :: num_cells_global          ! total number of cells in the mesh
-  PetscInt              , pointer         :: natural_id_cells_owned(:) ! natural IDs of cells that are locally owned
+  PetscInt              , public, pointer :: natural_id_cells_owned(:) ! natural IDs of cells that are locally owned
 
   integer               , public, pointer :: rdycore_pocn(:)           ! PE rank for each grid cell
 
