@@ -1,6 +1,6 @@
 module rof_comp_mct
 
-  ! !USES:
+   ! !USES:
 
   use esmf
   use netcdf
@@ -33,6 +33,8 @@ module rof_comp_mct
   implicit none
   save
   private ! except
+
+#include <mpif.h>
 
   !--------------------------------------------------------------------------
   ! Public interfaces
@@ -181,10 +183,11 @@ CONTAINS
 !JW        if (rof_prognostic) then
 
        ! Initialize rof gsMap for ocean rof and land rof
-       call rof_SetGSMap_mct( mpicom_rof, rofid, gsMap_rof)
+       !call rof_SetGSMap_mct( mpicom_rof, rofid, gsMap_rof)
+       !lsize = mct_gsMap_lsize(gsMap_rof, mpicom_rof)
+       call rof_SetGSMap_From_RDycore_mct( rofid, gsMap_rof)
 
        ! Initialize rof domain
-       lsize = mct_gsMap_lsize(gsMap_rof, mpicom_rof)
        call rof_domain_mct( lsize, gsMap_rof, dom_r )
 
        ! Initialize cpl -> RDycore attribute vector
@@ -342,6 +345,62 @@ CONTAINS
     ! call mct_gsMap_init( gsMap_rof, gindex, mpicom_r, rofid, lsize, gsize )
 
   end subroutine rof_SetGSMap_mct
+
+  !===============================================================================
+  subroutine rof_SetGSMap_From_RDycore_mct(rofid, gsMap_rof)
+   !
+   use rdycoreMod, only : num_cells_owned, num_cells_global, natural_id_cells_owned
+   !
+   implicit none
+   !
+   integer        , intent(in)    :: rofid         ! Runoff model identifier
+   type(mct_gsMap), intent(inout) :: gsMap_rof     ! MCT gsmap for runoff -> land data
+    !
+    ! LOCAL VARIABLES
+   integer :: i, ibeg, iend             ! indices
+   integer :: ier                       ! error code
+   integer, allocatable :: gindex(:)
+   character(len=32), parameter :: sub = 'rof_SetGSMap_From_RDycore_mct'
+
+   gsize = num_cells_global
+   lsize = num_cells_owned
+
+    ! TODO; get real mesh sizes
+   call rof_read_mosart()
+
+   ! get number of pes
+   call mpi_comm_size(mpicom, npes, ier)
+
+   ! allocate memory
+   allocate(start(npes), length(npes), pe_loc(npes))
+   start = 0
+   length = 0
+   pe_loc = 0
+
+   ! set only values corresponding to my rank
+   length(iam + 1) = lsize
+   pe_loc(iam + 1) = iam
+
+   call MPI_Scan(lsize, start(iam + 1), 1, MPI_INTEGER, MPI_SUM, mpicom, ier)
+   start(iam + 1) = start(iam + 1) + 1 - lsize
+
+   ibeg = start(iam + 1)
+   iend = ibeg + lsize - 1
+
+   ! set the indices that are locally owned
+   allocate(gindex(ibeg:iend))
+   do i = ibeg, iend
+      gindex(i) = natural_id_cells_owned(i - ibeg + 1) + 1 ! converting 0-based IDs to 1-based
+   enddo
+
+   ! create the gsMap
+   call mct_gsMap_init( gsMap_rof, gindex, mpicom, rofid, lsize, gsize )
+
+   ! free up memory
+   deallocate(gindex)
+
+   end subroutine rof_SetGSMap_From_RDycore_mct
+
 
   !===============================================================================
   !BOP ===========================================================================
