@@ -95,9 +95,9 @@ contains
     PetscCallA(VecCreateSeq(PETSC_COMM_SELF, num_cells_owned, nid_owned_seq, ierr))
 
     write(string,*)myrank
-    PetscCallA(VecGetArrayF90(nid_owned_seq, vec_ptr,ierr))
+    PetscCallA(VecGetArray(nid_owned_seq, vec_ptr,ierr))
     vec_ptr(:) = natural_id_cells_owned(:) * 1.d0
-    PetscCallA(VecRestoreArrayF90(nid_owned_seq, vec_ptr,ierr))
+    PetscCallA(VecRestoreArray(nid_owned_seq, vec_ptr,ierr))
 
     string = 'natural_id_seq_' // trim(adjustl(string)) // '.txt'
     PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_SELF, trim(string), viewer, ierr))
@@ -157,7 +157,7 @@ contains
     !allocate(rdycore_pocn(num_cells_global))
 
     ! determine the begin/end bounds of grid cells
-    !PetscCallA(VecGetArrayF90(owner_seq, vec_ptr, ierr))
+    !PetscCallA(VecGetArray(owner_seq, vec_ptr, ierr))
     rdy_bounds%begg = 1
     !do g = 1, num_cells_global
     !   rdycore_pocn(g) = int(vec_ptr(g))
@@ -166,7 +166,7 @@ contains
     !   end if
     !end do
     rdy_bounds%endg = rdy_bounds%begg - 1 + num_cells_owned
-    !PetscCallA(VecRestoreArrayF90(owner_seq, vec_ptr, ierr))
+    !PetscCallA(VecRestoreArray(owner_seq, vec_ptr, ierr))
 
     ! allocate data structure for exchanging data from land to rdycore
     call lnd2rdy_vars%Init(rdy_bounds)
@@ -249,11 +249,11 @@ contains
     allocate(int_array(dst_ncells))
 
     ! create IS from source grid
-    PetscCallA(VecGetArrayF90(src_idx_vec, v_loc, ierr))
+    PetscCallA(VecGetArray(src_idx_vec, v_loc, ierr))
     do ii = 1, dst_ncells
        int_array(ii) = int(v_loc(ii)) - 1 ! converting from 1-based index to 0-based index
     end do
-    PetscCallA(VecRestoreArrayF90(src_idx_vec, v_loc, ierr))
+    PetscCallA(VecRestoreArray(src_idx_vec, v_loc, ierr))
     PetscCallA(ISCreateBlock(PETSC_COMM_WORLD, nvars, dst_ncells, int_array, PETSC_COPY_VALUES, is_from, ierr))
 #if 0
     string = 'is_from.txt'

@@ -40,12 +40,12 @@ contains
     PetscErrorCode       :: ierr
 
     ! pack the data
-    PetscCallA(VecGetArrayF90(rtm2rdy_map%s_vec, v_loc, ierr))
+    PetscCallA(VecGetArray(rtm2rdy_map%s_vec, v_loc, ierr))
     do ii = 1, ncells_rtm
        v_loc((ii-1)*rtm2rdy_nvars + 1) = x2rd(index_x2rdy_Flrl_qsur, ii) * runoff_unit_conversion
        v_loc((ii-1)*rtm2rdy_nvars + 2) = x2rd(index_x2rdy_Flrl_qsub, ii) * runoff_unit_conversion
     end do
-    PetscCallA(VecRestoreArrayF90(rtm2rdy_map%s_vec, v_loc, ierr))
+    PetscCallA(VecRestoreArray(rtm2rdy_map%s_vec, v_loc, ierr))
 
     ! scatter the data
     PetscCallA(VecScatterBegin(rtm2rdy_map%s2d_scatter, rtm2rdy_map%s_vec, rtm2rdy_map%d_vec, INSERT_VALUES, SCATTER_FORWARD, ierr))
@@ -68,7 +68,7 @@ contains
 #endif
 
     ! unpack the data
-    PetscCallA(VecGetArrayF90(rtm2rdy_map%d_vec, v_loc, ierr))
+    PetscCallA(VecGetArray(rtm2rdy_map%d_vec, v_loc, ierr))
 
     do g = rdy_bounds%begg, rdy_bounds%endg
        idx = (g - rdy_bounds%begg)*rtm2rdy_nvars
@@ -77,7 +77,7 @@ contains
        lnd2rdy_vars%forc_qsub(g) = v_loc(idx + 2)
     end do
 
-    PetscCallA(VecRestoreArrayF90(rtm2rdy_map%d_vec, v_loc, ierr))
+    PetscCallA(VecRestoreArray(rtm2rdy_map%d_vec, v_loc, ierr))
 
   end subroutine rdy_import_mct
 
