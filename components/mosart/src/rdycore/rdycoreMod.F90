@@ -10,12 +10,18 @@ module rdycoreMod
   use lnd2rdyType  , only : lnd2rdy_type
   use rdydecompMod , only : rdy_bounds_type
   use rdymapMod    , only : rdy_map_type
+  use rdyconditionMod, only : BoundaryCondition
+  use rdyconditionMod, only : ParseBoundaryDataOptions
+  use rdyconditionMod, only : CreateBoundaryConditionDataset
+  use rdyconditionMod, only : ApplyBoundaryCondition
 
   implicit none
 
   private
 
   type(RDy)                               :: rdy_                      ! RDycore data structure
+
+  type(BoundaryCondition)                 :: bc_dataset                ! boundary condition (e.g., ocean BC)
 
   PetscInt              , public          :: num_cells_owned           ! number of cells that locally owned
   PetscInt              , public          :: num_cells_global          ! total number of cells in the mesh
@@ -77,6 +83,8 @@ contains
     ! initialize subsystems
     PetscCallA(RDyInit(ierr))
  
+    call ParseBoundaryDataOptions(bc_dataset)
+
     ! create rdycore and set it up with the given file
     PetscCallA(RDyCreate(PETSC_COMM_WORLD, config_file, rdy_, ierr))
     PetscCallA(RDySetup(rdy_, ierr))
@@ -174,6 +182,9 @@ contains
     ! free up memory
     !PetscCallA(VecDestroy(owner_mpi, ierr))
     !PetscCallA(VecDestroy(owner_seq, ierr))
+
+    ! Create boundary condition dataset
+    call CreateBoundaryConditionDataset(rdy_, bc_dataset)
 
     if (masterproc) then
        write(iulog,*)'RDycore model initialization completed'
@@ -374,7 +385,7 @@ contains
     real(r8)             :: dtime
     PetscInt             :: t, nstep
     integer(RDyTimeUnit) :: time_unit
-    PetscReal            :: time_dn, time_up, cur_time, cur_rain
+    PetscReal            :: time_dn, time_up, cur_time, cur_rain, cur_time_rdycore
     PetscBool            :: found
     PetscInt             :: g, idx
     PetscErrorCode       :: ierr
@@ -400,6 +411,9 @@ contains
     ! Set the coupling time step
     PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
     PetscCallA(RDySetCouplingInterval(rdy_, time_unit, dtime, ierr))
+
+    PetscCallA(RDyGetTime(rdy_, time_unit, cur_time_rdycore, ierr))
+    call ApplyBoundaryCondition(rdy_, cur_time_rdycore, bc_dataset)
 
     ! Run the simulation to completion.
     PetscCallA(RDyAdvance(rdy_, ierr))
