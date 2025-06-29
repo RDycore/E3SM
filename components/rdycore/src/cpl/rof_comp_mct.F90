@@ -378,7 +378,7 @@ CONTAINS
    call rof_read_mosart()
 
    ! get number of pes
-   call mpi_comm_size(mpicom, npes, ier)
+   call mpi_comm_size(mpicom_rof, npes, ier)
 
    ! allocate memory
    allocate(start(npes), length(npes), pe_loc(npes))
@@ -390,7 +390,7 @@ CONTAINS
    length(iam + 1) = lsize
    pe_loc(iam + 1) = iam
 
-   call MPI_Scan(lsize, start(iam + 1), 1, MPI_INTEGER, MPI_SUM, mpicom, ier)
+   call MPI_Scan(lsize, start(iam + 1), 1, MPI_INTEGER, MPI_SUM, mpicom_rof, ier)
    start(iam + 1) = start(iam + 1) + 1 - lsize
 
    ibeg = start(iam + 1)
@@ -403,7 +403,7 @@ CONTAINS
    enddo
 
    ! create the gsMap
-   call mct_gsMap_init( gsMap_rof, gindex, mpicom, rofid, lsize, gsize )
+   call mct_gsMap_init( gsMap_rof, gindex, mpicom_rof, rofid, lsize, gsize )
 
    ! free up memory
    deallocate(gindex)
@@ -463,9 +463,6 @@ CONTAINS
     call mct_gGrid_importRAttr(dom_rof,"mask" ,data,lsize)
 
     ! TODO - Fill in correct values for domain components
-    lstart = start(iam+1)
-    lstop  = start(iam+1) + length(iam+1) - 1
-
     ni = 0
     do n = 1, lsize
       ni = natural_id_cells_owned(n) + 1
