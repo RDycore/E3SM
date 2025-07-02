@@ -50,7 +50,7 @@ module rof_comp_mct
 
   integer                :: lsize    
 
-  ! temporary for reading mosart file and making dummy domain
+  ! temporary for reading rdycore file and making dummy domain
   integer :: nlatg, nlong, gsize         ! size of runoff data and number of grid cells
 
   logical :: isgrid2d                    ! true if the grid is 2D, else false
@@ -337,7 +337,7 @@ CONTAINS
     !-----------------------------------------------------
 
     ! TODO; get real mesh sizes
-    call rof_read_mosart()
+    call rof_read_rdycore()
 
     ! get number of pes
     call mpi_comm_size(mpicom_rof, npes, ier)
@@ -384,7 +384,7 @@ CONTAINS
    lsize = num_cells_owned
 
     ! TODO; get real mesh sizes
-   call rof_read_mosart()
+   call rof_read_rdycore()
 
    ! get number of pes
    call mpi_comm_size(mpicom_rof, npes, ier)
@@ -592,7 +592,7 @@ CONTAINS
 
 !====================================================================================
 
-  subroutine  rof_read_mosart0()
+  subroutine  rof_read_rdycore0()
 
     use shr_mpi_mod
     !---------------------------------------------------------------------------
@@ -617,7 +617,7 @@ CONTAINS
 
     !---------------------------------------------------------------------------
 
-    ! open mosart file
+    ! open rdycore file
     filename_rof = '/global/cfs/cdirs/e3sm/inputdata/rof/mosart/MOSART_global_half_20180721a.nc'
 
     ! read file only from master_task
@@ -645,8 +645,8 @@ CONTAINS
     end if
 
     ! broadcast dimensions
-    call shr_mpi_bcast (lat, mpicom_rof, 'rof_read_mosart')
-    call shr_mpi_bcast (lon, mpicom_rof, 'rof_read_mosart')
+    call shr_mpi_bcast (lat, mpicom_rof, 'rof_read_rdycore')
+    call shr_mpi_bcast (lon, mpicom_rof, 'rof_read_rdycore')
 
     ! set dimensions on all processors
     gsize = lat*lon
@@ -681,9 +681,9 @@ CONTAINS
     endif
 
     ! broadcast lat1D, lon1D and arear
-    call shr_mpi_bcast (lat1D, mpicom_rof, 'rof_read_mosart')
-    call shr_mpi_bcast (lon1D, mpicom_rof, 'rof_read_mosart')
-    call shr_mpi_bcast (area,  mpicom_rof, 'rof_read_mosart')
+    call shr_mpi_bcast (lat1D, mpicom_rof, 'rof_read_rdycore')
+    call shr_mpi_bcast (lon1D, mpicom_rof, 'rof_read_rdycore')
+    call shr_mpi_bcast (area,  mpicom_rof, 'rof_read_rdycore')
 
     ! load 2d data into 1d arrays
     count = 0
@@ -708,10 +708,10 @@ CONTAINS
 
     return
 
-  end subroutine rof_read_mosart0
+  end subroutine rof_read_rdycore0
 !====================================================================================
 
-  subroutine  rof_read_mosart()
+  subroutine  rof_read_rdycore()
 
     use shr_mpi_mod
     !---------------------------------------------------------------------------
@@ -726,7 +726,7 @@ CONTAINS
     integer :: i, j, count, ier
     logical :: found
     character(len=128) :: filename_rof
-    character(len=*),parameter :: subname = '(rof_read_mosart) '
+    character(len=*),parameter :: subname = '(rof_read_rdycore) '
     integer, parameter :: RKIND = selected_real_kind(13)
     real(kind=RKIND), dimension(:),   allocatable :: lat1D, lon1D, area1D
     real(kind=RKIND), dimension(:,:), allocatable :: area
@@ -734,11 +734,11 @@ CONTAINS
 
     !---------------------------------------------------------------------------
 
-    ! open mosart file
-    filename_rof = '/global/cfs/cdirs/e3sm/inputdata/rof/mosart/MOSART_global_half_20180721a.nc'
+    ! open rdycore file
+    filename_rof = '/global/cfs/cdirs/e3sm/inputdata/rof/rdycore/MOSART_global_half_20180721a.nc'
 
     if (masterproc) then
-       write(logunit_rof,*) 'Read in MOSART file name: ',trim(filename_rof)
+       write(logunit_rof,*) 'Read in RDycore file name: ',trim(filename_rof)
        call shr_sys_flush(logunit_rof)
     endif
 
@@ -748,11 +748,11 @@ CONTAINS
 
     if (masterproc) then
        write(logunit_rof,*) 'Values for lon/lat: ', nlong, nlatg, gsize
-       write(logunit_rof,*) 'Successfully read MOSART dimensions'
+       write(logunit_rof,*) 'Successfully read RDycore dimensions'
        if (isgrid2d) then
-        write(logunit_rof,*) 'MOSART input is 2d'
+        write(logunit_rof,*) 'RDycore input is 2d'
        else
-        write(logunit_rof,*) 'MOSART input is 1d'
+        write(logunit_rof,*) 'RDycore input is 1d'
        endif
        call shr_sys_flush(logunit_rof)
     endif
@@ -769,15 +769,15 @@ CONTAINS
 
        ! read the mesh data
        call ncd_io(ncid=ncid, varname='lon', flag='read', data=lon1D, readvar=found)
-       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART longitudes')
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read RDycore longitudes')
        if (masterproc) write(logunit_rof,*) 'Read lon ',minval(lon1D),maxval(lon1D)
 
        call ncd_io(ncid=ncid, varname='lat', flag='read', data=lat1D, readvar=found)
-       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART latitudes')
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read RDycore latitudes')
        if (masterproc) write(logunit_rof,*) 'Read lat ',minval(lat1D),maxval(lat1D)
 
        call ncd_io(ncid=ncid, varname='area', flag='read', data=areac_g, readvar=found)
-       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART area')
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read RDycore area')
        if (masterproc) write(logunit_rof,*) 'Read area ',minval(areac_g),maxval(areac_g)
 
        count = 0
@@ -801,19 +801,19 @@ CONTAINS
 
        ! read the mesh data
        call ncd_io(ncid=ncid, varname='lon', flag='read', data=lonc_l, dim1name='gridcell', readvar=found)
-       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART longitudes')
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read RDycore longitudes')
 
        call ncd_io(ncid=ncid, varname='lat', flag='read', data=latc_l, dim1name='gridcell', readvar=found)
-       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART latitudes')
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read RDycore latitudes')
 
        call ncd_io(ncid=ncid, varname='area', flag='read', data=areac_l, dim1name='gridcell', readvar=found)
-       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART area')
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read RDycore area')
 
     endif
 
     return
 
-  end subroutine rof_read_mosart
+  end subroutine rof_read_rdycore
 !====================================================================================
 
 end module rof_comp_mct
