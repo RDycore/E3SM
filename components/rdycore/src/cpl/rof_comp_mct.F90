@@ -51,10 +51,19 @@ module rof_comp_mct
   integer                :: lsize    
 
   ! temporary for reading mosart file and making dummy domain
-  integer :: nlatg, nlong, gsize       ! size of runoff data and number of grid cells
-  real(r8), allocatable :: latc(:)     ! latitude of 1d grid cell (deg)
-  real(r8), allocatable :: lonc(:)     ! longitude of 1d grid cell (deg)
-  real(r8), allocatable :: areac(:)    ! area of 1d grid cell (deg)
+  integer :: nlatg, nlong, gsize         ! size of runoff data and number of grid cells
+
+  logical :: isgrid2d                    ! true if the grid is 2D, else false
+
+  ! global cell = all cells in the mesh
+  real(r8), allocatable :: latc_g(:)     ! global latitude of 1d grid cell (deg)
+  real(r8), allocatable :: lonc_g(:)     ! global longitude of 1d grid cell (deg)
+  real(r8), allocatable :: areac_g(:)    ! global area of 1d grid cell (deg)
+
+  ! local cell = cells owned by each MPI rank
+  real(r8), allocatable :: latc_l(:)     ! local latitude of 1d grid cell (deg)
+  real(r8), allocatable :: lonc_l(:)     ! local longitude of 1d grid cell (deg)
+  real(r8), allocatable :: areac_l(:)    ! local area of 1d grid cell (deg)
 
   integer, allocatable :: start(:)     ! for gsmap initialization
   integer, allocatable :: length(:)    ! for gsmap initialization
@@ -463,25 +472,40 @@ CONTAINS
     call mct_gGrid_importRAttr(dom_rof,"mask" ,data,lsize)
 
     ! TODO - Fill in correct values for domain components
-    ni = 0
-    do n = 1, lsize
-      ni = natural_id_cells_owned(n) + 1
-      data(n) = lonc(ni)
-    end do
-    call mct_gGrid_importRattr(dom_rof,"lon",data,lsize)
+    if (isgrid2d) then
+       ni = 0
+       do n = 1, lsize
+          ni = natural_id_cells_owned(n) + 1
+          data(n) = lonc_g(ni)
+       end do
+       call mct_gGrid_importRattr(dom_rof,"lon",data,lsize)
 
-    ni = 0
-    do n = 1, lsize
-       ni = natural_id_cells_owned(n) + 1
-       data(n) = latc(ni)
-    end do
-    call mct_gGrid_importRattr(dom_rof,"lat",data,lsize)
+       ni = 0
+       do n = 1, lsize
+          ni = natural_id_cells_owned(n) + 1
+          data(n) = latc_g(ni)
+       end do
+       call mct_gGrid_importRattr(dom_rof,"lat",data,lsize)
 
-    do n = 1, lsize
-      ni = natural_id_cells_owned(n) + 1
-      data(n) = areac(ni)*1.0e-6_r8/(re*re)
-    end do
-    call mct_gGrid_importRattr(dom_rof,"area",data,lsize)
+       do n = 1, lsize
+          ni = natural_id_cells_owned(n) + 1
+          data(n) = areac_g(ni)*1.0e-6_r8/(re*re)
+       end do
+       call mct_gGrid_importRattr(dom_rof,"area",data,lsize)
+
+    else
+
+       data(:) = lonc_l(:)
+       call mct_gGrid_importRattr(dom_rof,"lon",data,lsize)
+
+       data(:) = latc_l(:)
+       call mct_gGrid_importRattr(dom_rof,"lat",data,lsize)
+
+       do n = 1, lsize
+          data(n) = areac_l(n)*1.0e-6_r8/(re*re)
+       end do
+       call mct_gGrid_importRattr(dom_rof,"area",data,lsize)
+    end if
 
     do n = 1, lsize
       data(n) = 1.0_r8
@@ -633,9 +657,9 @@ CONTAINS
     allocate(lat1D(lat))
     allocate(lon1D(lon))
     allocate(area(lat,lon))
-    allocate(lonc(gsize))
-    allocate(latc(gsize))
-    allocate(areac(gsize))
+    allocate(lonc_g(gsize))
+    allocate(latc_g(gsize))
+    allocate(areac_g(gsize))
 
     ! read in lat, lon, and area only on master_task
     if (masterproc) then
@@ -666,9 +690,9 @@ CONTAINS
     do j = 1, nlong
        do i = 1, nlatg
          count = count + 1
-         latc(count)  = lat1D(i)
-         lonc(count)  = lon1D(j)
-         areac(count) = area(i,j)
+         latc_g(count)  = lat1D(i)
+         lonc_g(count)  = lon1D(j)
+         areac_g(count) = area(i,j)
        end do
     end do
 
@@ -700,7 +724,7 @@ CONTAINS
     !
     ! LOCAL VARIABLES
     integer :: i, j, count, ier
-    logical :: found, isgrid2d
+    logical :: found
     character(len=128) :: filename_rof
     character(len=*),parameter :: subname = '(rof_read_mosart) '
     integer, parameter :: RKIND = selected_real_kind(13)
@@ -735,46 +759,57 @@ CONTAINS
 
     ! allocate arrays
     if (isgrid2d) then
+
        allocate(lon1D(nlong))
        allocate(lat1D(nlatg))
-    else
-       allocate(lon1D(gsize))
-       allocate(lat1D(gsize))
-   endif
-    allocate(lonc(gsize))
-    allocate(latc(gsize))
-    allocate(areac(gsize))
 
-    ! read the mesh data
-    call ncd_io(ncid=ncid, varname='lon', flag='read', data=lon1D, readvar=found)
-    if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART longitudes')
-    if (masterproc) write(logunit_rof,*) 'Read lon ',minval(lon1D),maxval(lon1D)
+       allocate(lonc_g(gsize))
+       allocate(latc_g(gsize))
+       allocate(areac_g(gsize))
 
-    call ncd_io(ncid=ncid, varname='lat', flag='read', data=lat1D, readvar=found)
-    if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART latitudes')
-    if (masterproc) write(logunit_rof,*) 'Read lat ',minval(lat1D),maxval(lat1D)
+       ! read the mesh data
+       call ncd_io(ncid=ncid, varname='lon', flag='read', data=lon1D, readvar=found)
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART longitudes')
+       if (masterproc) write(logunit_rof,*) 'Read lon ',minval(lon1D),maxval(lon1D)
 
-    call ncd_io(ncid=ncid, varname='area', flag='read', data=areac, readvar=found)
-    if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART area')
-    if (masterproc) write(logunit_rof,*) 'Read area ',minval(areac),maxval(areac)
+       call ncd_io(ncid=ncid, varname='lat', flag='read', data=lat1D, readvar=found)
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART latitudes')
+       if (masterproc) write(logunit_rof,*) 'Read lat ',minval(lat1D),maxval(lat1D)
 
-    ! load 2d data into 1d arrays
-    if (isgrid2d) then
+       call ncd_io(ncid=ncid, varname='area', flag='read', data=areac_g, readvar=found)
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART area')
+       if (masterproc) write(logunit_rof,*) 'Read area ',minval(areac_g),maxval(areac_g)
+
        count = 0
        do j = 1, nlong
           do i = 1, nlatg
              count = count + 1
-             latc(count)  = lat1D(i)
-             lonc(count)  = lon1D(j)
+             latc_g(count)  = lat1D(i)
+             lonc_g(count)  = lon1D(j)
           end do
        end do
-    else
-       latc(:) = lat1D(:)
-       lonc(:) = lon1D(:)
-    endif
 
-    deallocate(lat1D)
-    deallocate(lon1D)
+       ! free up memory
+       deallocate(lat1D)
+       deallocate(lon1D)
+
+    else
+
+       allocate(lonc_l(lsize))
+       allocate(latc_l(lsize))
+       allocate(areac_l(lsize))
+
+       ! read the mesh data
+       call ncd_io(ncid=ncid, varname='lon', flag='read', data=lonc_l, dim1name='gridcell', readvar=found)
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART longitudes')
+
+       call ncd_io(ncid=ncid, varname='lat', flag='read', data=latc_l, dim1name='gridcell', readvar=found)
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART latitudes')
+
+       call ncd_io(ncid=ncid, varname='area', flag='read', data=areac_l, dim1name='gridcell', readvar=found)
+       if ( .not. found ) call shr_sys_abort( trim(subname)//' ERROR: read MOSART area')
+
+    endif
 
     return
 
