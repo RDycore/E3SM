@@ -24,4 +24,14 @@
     <lname>2000_DATM%QIA_DLND%GPCC_SICE_DOCN%DOM_RDYCORE_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>RDGTSM2ELM</alias>
+    <lname>2000_DATM%GSWP3v1_ELM_SICE_DOCN%GTSM_RDYCORE_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>F2010-SCREAM-RD</alias>
+    <lname>2010_SCREAM_ELM%SPBC_CICE%PRES_DOCN%DOM_RDYCORE_SGLC_SWAV</lname>
+  </compset>
+
 </compsets>

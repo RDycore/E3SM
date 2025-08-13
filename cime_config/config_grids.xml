@@ -64,6 +64,16 @@
       <mask>reg</mask>
     </model_grid>
 
+    <model_grid alias="ELMRD_USRDAT" compset="(DATM|SATM).+ELM.+RDYCORE">
+      <grid name="atm">ELM_USRDAT</grid>
+      <grid name="lnd">ELM_USRDAT</grid>
+      <grid name="ocnice">ELM_USRDAT</grid>
+      <grid name="rof">ELM_USRDAT</grid>
+      <grid name="glc">null</grid>
+      <grid name="wav">null</grid>
+      <mask>reg</mask>
+    </model_grid>
+
     <model_grid alias="ELMMOS_USRDAT" compset="(DATM|SATM).+ELM.+MOSART">
       <grid name="atm">ELM_USRDAT</grid>
       <grid name="lnd">ELM_USRDAT</grid>
@@ -202,6 +212,26 @@
       <grid name="glc">null</grid>
       <grid name="wav">null</grid>
       <mask>NLDAS</mask>
+    </model_grid>
+
+    <model_grid alias="Houston1km_GTSM" compset="(DATM|SATM).+ELM.+RDYCORE">
+      <grid name="atm">GTSM</grid>
+      <grid name="lnd">GTSM</grid>
+      <grid name="ocnice">GTSM</grid>
+      <grid name="rof">Houston1km_RD</grid>
+      <grid name="glc">null</grid>
+      <grid name="wav">null</grid>
+      <mask>reg</mask>
+    </model_grid>
+
+    <model_grid alias="ne4_ne4_Houston1km" compset="EAM.+ELM.+RDYCORE">
+      <grid name="atm">ne4np4</grid>
+      <grid name="lnd">ne4np4</grid>
+      <grid name="ocnice">ne4np4</grid>
+      <grid name="rof">Houston1km_RD</grid>
+      <grid name="glc">null</grid>
+      <grid name="wav">null</grid>
+      <mask>oQU240</mask>
     </model_grid>
 
     <!-- eulerian grids -->
@@ -2955,6 +2985,14 @@
       <desc>NLDAS US one eighth degree grid -- only valid for DATM/ELM compset</desc>
     </domain>
 
+    <domain name="GTSM">
+      <nx>84300</nx>
+      <ny>1</ny>
+      <file grid="atm|lnd">$DIN_LOC_ROOT/share/domains/domain_global_coastline_merit_90m.nc</file>
+      <file grid="ocn|ice">$DIN_LOC_ROOT/share/domains/domain_global_coastline_merit_90m.nc</file>
+      <desc></desc>
+    </domain>
+
     <domain name="0.23x0.31">
       <nx>1152</nx>
       <ny>768</ny>
@@ -5354,6 +5392,11 @@
       <map name="ATM2ROF_SMAPNAME">lnd/clm2/mappingdata/maps/ne4np4/map_ne4np4_TO_r05_aave.160621.nc</map>
     </gridmap>
 
+    <gridmap atm_grid="ne4np4" rof_grid="Houston1km_RD">
+      <map name="ATM2ROF_FMAPNAME">lnd/clm2/mappingdata/maps/ne4np4/map.ne4np4_to_Houston1km_RDycore.nc</map>
+      <map name="ATM2ROF_SMAPNAME">lnd/clm2/mappingdata/maps/ne4np4/map.ne4np4_to_Houston1km_RDycore.nc</map>
+    </gridmap>
+
     <gridmap atm_grid="ne4np4.pg2" rof_grid="r2">
       <map name="ATM2ROF_FMAPNAME">cpl/gridmaps/ne4pg2/map_ne4pg2_to_r2_mono.210211.nc</map>
       <map name="ATM2ROF_SMAPNAME">cpl/gridmaps/ne4pg2/map_ne4pg2_to_r2_mono.210211.nc</map>
@@ -5523,6 +5566,19 @@
     <gridmap lnd_grid="360x720cru" rof_grid="r05">
       <map name="LND2ROF_FMAPNAME">lnd/clm2/mappingdata/maps/0.5x0.5/map_360x720_nomask_to_0.5x0.5_nomask_aave_da_c130103.nc</map>
       <map name="ROF2LND_FMAPNAME">lnd/clm2/mappingdata/maps/360x720/map_0.5x0.5_nomask_to_360x720_nomask_aave_da_c120830.nc</map>
+    </gridmap>
+
+    <gridmap lnd_grid="GTSM" rof_grid="Houston1km_RD">
+      <map name="LND2ROF_FMAPNAME">lnd/clm2/mappingdata/maps/GTSM/map.Houston1km.GTSM_to_RDycore.nc</map>
+    </gridmap>
+
+    <gridmap ocn_grid="GTSM" rof_grid="Houston1km_RD">
+      <map name="LND2ROF_FMAPNAME">lnd/clm2/mappingdata/maps/GTSM/map.Houston1km.GTSM_to_RDycore.nc</map>
+    </gridmap>
+
+    <gridmap lnd_grid="ne4np4" rof_grid="Houston1km_RD">
+      <map name="LND2ROF_FMAPNAME">lnd/clm2/mappingdata/maps/ne4np4/map.ne4np4_to_Houston1km_RDycore.nc</map>
+      <map name="ROF2LND_FMAPNAME">lnd/clm2/mappingdata/maps/ne4np4/map.Houston1km_RDycore_to_ne4np4.nc</map>
     </gridmap>
 
     <gridmap lnd_grid="ne4np4" rof_grid="r05">
