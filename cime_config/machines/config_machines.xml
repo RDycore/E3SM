@@ -577,6 +577,7 @@
     </environment_variables>
     <environment_variables compiler="intelgpu" mpilib="mpich">
       <env name="MPICH_GPU_SUPPORT_ENABLED">1</env>
+      <env name="LD_LIBRARY_PATH">$ENV{CRAY_LD_LIBRARY_PATH}:$ENV{LD_LIBRARY_PATH}</env>
     </environment_variables>
     <environment_variables BUILD_THREADED="TRUE">
       <env name="OMP_STACKSIZE">128M</env>
